@@ -43,7 +43,7 @@ jobs:
           # 尋找並移動 OTA 專用的 bin 檔
           # 注意：v6 版通常會生成 'sonoff-s31.ota.bin' 或類似名稱
           # 我們直接把找到的第一個 .bin 搬出來改名
-          find . -name "firmware.bin" -print0 | xargs -0 -I {} mv {} ../sonoff-s31.bin
+          mv *.ota.bin ../sonoff-s31.bin
           
           # 回到上一層目錄
           cd ..
