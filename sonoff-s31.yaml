@@ -57,7 +57,7 @@ button:
       - ota.http_request.flash:
 
           url: !lambda |-
-            return "https://github.com/您的帳號/Repo/releases/download/v1.0.1/sonoff-s31.bin";
+            return "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.bin";
 
 
   - platform: restart
