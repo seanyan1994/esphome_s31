@@ -1,65 +1,93 @@
-name: Build and Update Latest Firmware
+name: Auto Build & Commit Firmware
 
 on:
+  schedule:
+    - cron: '0 3 * * *'  # 每天檢查一次
   push:
     paths:
-      - '*.yaml'          # 只有當 YAML 變更時才觸發
+      - '*.yaml'
       - '.github/workflows/**'
     branches:
-      - main              # 或 master，請確認您的主分支名稱
+      - main  # 確認您的分支名稱
+  workflow_dispatch:
 
 permissions:
-  contents: write         # 給予 Action 寫入 Releases 的權限
+  contents: write  # 重要：必須有寫入權限才能 Commit 回去
 
 jobs:
-  build-and-release:
+  build-and-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # 使用預設 Token
 
-      # 1. 還原 secrets.yaml
-      - name: Create secrets.yaml
+      # --- 1. 版本檢查邏輯 (選用，不檢查也行，反正沒變更 Commit 會是空的) ---
+      - name: Check ESPHome Version
+        id: check_version
         run: |
-          echo "${{ secrets.ESPHOME_SECRETS_YAML }}" > secrets.yaml
+          LATEST_VERSION=$(curl -s https://registry.hub.docker.com/v2/repositories/esphome/esphome/tags/stable | jq -r '.name' || echo "unknown")
+          echo "Latest version: $LATEST_VERSION"
+          
+          if [ -f .last_build_version ]; then
+            LAST_BUILD=$(cat .last_build_version)
+          else
+            LAST_BUILD="none"
+          fi
+          
+          # 若是 Schedule 觸發且版本相同，則跳過
+          if [ "$LATEST_VERSION" == "$LAST_BUILD" ] && [ "${{ github.event_name }}" == "schedule" ]; then
+             echo "should_build=false" >> $GITHUB_OUTPUT
+             echo "Already up to date."
+          else
+             echo "should_build=true" >> $GITHUB_OUTPUT
+             echo "New version detected or manual trigger."
+          fi
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
-      # 2. 編譯 ESPHome 韌體
+      # --- 2. 準備環境 & 編譯 ---
+      - name: Create secrets.yaml
+        if: steps.check_version.outputs.should_build == 'true'
+        run: echo "${{ secrets.ESPHOME_SECRETS_YAML }}" > secrets.yaml
+
       - name: Build Sonoff S31 Firmware
+        if: steps.check_version.outputs.should_build == 'true'
         uses: esphome/build-action@v6
         id: esphome_build
         with:
-          yaml-file: sonoff-s31.yaml   # 請替換成您的 YAML 檔名
+          yaml-file: sonoff-s31.yaml
           version: latest
 
-      # 3. 重新命名檔案 (確保下載名稱固定)
-      - name: Rename Artifact
+      # --- 3. 處理檔案 & 生成 MD5 ---
+      - name: Process Artifacts
+        if: steps.check_version.outputs.should_build == 'true'
         run: |
-          # 進入 Action 生成的輸出目錄 (目錄名稱就是 outputs.name)
-          cd ${{ steps.esphome_build.outputs.name }}
-          
-          # 顯示一下目錄內容，方便除錯 (可選)
-          ls -la
-          
-          # 尋找並移動 OTA 專用的 bin 檔
-          # 注意：v6 版通常會生成 'sonoff-s31.ota.bin' 或類似名稱
-          # 我們直接把找到的第一個 .bin 搬出來改名
-          mv *.ota.bin ../sonoff-s31.bin
-          
-          # 回到上一層目錄
-          cd ..
+          # 從輸出目錄找 .ota.bin 搬到根目錄
+          find ${{ steps.esphome_build.outputs.name }} -name "*.ota.bin" -exec mv {} ./sonoff-s31.bin \;
           
           # 生成 MD5
           md5sum sonoff-s31.bin | cut -d ' ' -f 1 > sonoff-s31.md5
+          
+          # 更新版本記錄檔
+          echo "${{ steps.check_version.outputs.version }}" > .last_build_version
+          
+          # 刪除 secrets.yaml (以防不小心 commit)
+          rm secrets.yaml
 
-      # 4. 發布/更新 Release (核心步驟)
-      - name: Update Latest Release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "sonoff-s31.bin,sonoff-s31.md5"
-          tag: "latest"                # 固定 Tag 名稱
-          name: "Latest Firmware Build"
-          body: "Auto-generated build from ${{ github.sha }}"
-          allowUpdates: true           # 允許更新已存在的 Release
-          replacesArtifacts: true      # 允許覆蓋舊的 .bin 檔案
-          makeLatest: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # --- 4. Commit 回 Repo (核心步驟) ---
+      - name: Commit and Push
+        if: steps.check_version.outputs.should_build == 'true'
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          # 強制加入二進制檔案 (即使 .gitignore 有忽略)
+          git add -f sonoff-s31.bin sonoff-s31.md5 .last_build_version
+          
+          # 嘗試 Commit，如果沒有變更 (例如編譯結果完全一樣) 則不報錯
+          # [skip ci] 很重要！防止這次 Commit 又觸發一次 Workflow 造成無限迴圈
+          git commit -m "Auto-build firmware [skip ci]" || echo "No changes to commit"
+          
+          # 推送
+          git push origin main
