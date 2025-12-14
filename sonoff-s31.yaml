@@ -55,8 +55,8 @@ button:
     entity_category: config
     on_press:
       - ota.http_request.flash:  
-          url: "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.bin"
-          md5_url: "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.md5"
+          url: "https://cdn.jsdelivr.net/gh/seanyan1994/esphome_s31@main/sonoff-s31.bin"
+          md5_url: "https://cdn.jsdelivr.net/gh/seanyan1994/esphome_s31@main/sonoff-s31.md5"
 
 
   - platform: restart
