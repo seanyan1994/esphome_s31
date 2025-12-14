@@ -1,0 +1,50 @@
+name: Build and Update Latest Firmware
+
+on:
+  push:
+    paths:
+      - '*.yaml'          # 只有當 YAML 變更時才觸發
+      - '.github/workflows/**'
+    branches:
+      - main              # 或 master，請確認您的主分支名稱
+
+permissions:
+  contents: write         # 給予 Action 寫入 Releases 的權限
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. 還原 secrets.yaml
+      - name: Create secrets.yaml
+        run: |
+          echo "${{ secrets.ESPHOME_SECRETS_YAML }}" > secrets.yaml
+
+      # 2. 編譯 ESPHome 韌體
+      - name: Build Sonoff S31 Firmware
+        uses: esphome/build-action@v6
+        id: esphome_build
+        with:
+          yaml-file: sonoff-s31.yaml   # 請替換成您的 YAML 檔名
+          version: latest
+
+      # 3. 重新命名檔案 (確保下載名稱固定)
+      - name: Rename Artifact
+        run: |
+          mv ${{ steps.esphome_build.outputs.name }}.bin sonoff-s31.bin
+
+      # 4. 發布/更新 Release (核心步驟)
+      - name: Update Latest Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "sonoff-s31.bin"
+          tag: "latest"                # 固定 Tag 名稱
+          name: "Latest Firmware Build"
+          body: "Auto-generated build from ${{ github.sha }}"
+          allowUpdates: true           # 允許更新已存在的 Release
+          replacesArtifacts: true      # 允許覆蓋舊的 .bin 檔案
+          makeLatest: true
+          token: ${{ secrets.GITHUB_TOKEN }}
