@@ -34,7 +34,21 @@ jobs:
       # 3. 重新命名檔案 (確保下載名稱固定)
       - name: Rename Artifact
         run: |
-          mv ${{ steps.esphome_build.outputs.name }}.bin sonoff-s31.bin
+          # 進入 Action 生成的輸出目錄 (目錄名稱就是 outputs.name)
+          cd ${{ steps.esphome_build.outputs.name }}
+          
+          # 顯示一下目錄內容，方便除錯 (可選)
+          ls -la
+          
+          # 尋找並移動 OTA 專用的 bin 檔
+          # 注意：v6 版通常會生成 'sonoff-s31.ota.bin' 或類似名稱
+          # 我們直接把找到的第一個 .bin 搬出來改名
+          find . -name "firmware.bin" -print0 | xargs -0 -I {} mv {} ../sonoff-s31.bin
+          
+          # 回到上一層目錄
+          cd ..
+          
+          # 生成 MD5
           md5sum sonoff-s31.bin | cut -d ' ' -f 1 > sonoff-s31.md5
 
       # 4. 發布/更新 Release (核心步驟)
