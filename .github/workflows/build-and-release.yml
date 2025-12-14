@@ -35,12 +35,13 @@ jobs:
       - name: Rename Artifact
         run: |
           mv ${{ steps.esphome_build.outputs.name }}.bin sonoff-s31.bin
+          md5sum sonoff-s31.bin | cut -d ' ' -f 1 > sonoff-s31.md5
 
       # 4. 發布/更新 Release (核心步驟)
       - name: Update Latest Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "sonoff-s31.bin"
+          artifacts: "sonoff-s31.bin,sonoff-s31.md5"
           tag: "latest"                # 固定 Tag 名稱
           name: "Latest Firmware Build"
           body: "Auto-generated build from ${{ github.sha }}"
