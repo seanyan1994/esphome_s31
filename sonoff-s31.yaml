@@ -54,10 +54,9 @@ button:
     name: "${device_name} 韌體更新"
     entity_category: config
     on_press:
-      - ota.http_request.flash:
-
-          url: !lambda |-
-            return "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.bin";
+      - ota.http_request.flash:  
+          url: "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.bin"
+          md5_url: "https://github.com/seanyan1994/esphome_s31/releases/download/latest/sonoff-s31.md5"
 
 
   - platform: restart
