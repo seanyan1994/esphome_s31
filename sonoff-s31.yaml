@@ -13,7 +13,8 @@ esp8266:
 
 # Enable Home Assistant API
 api:
-
+#  encryption:
+#    key: "nXVldUv5JTZuspod8m5hYWDwi0j2C1JXlTYNASHkusY="
 
 http_request:
   verify_ssl: false
@@ -32,7 +33,7 @@ wifi:
     password: !secret wifi_password
 
 web_server:
-  port: 80  
+  port: 80  # 如果未指定，默認使用 80 端口
   version: 3
   
 captive_portal: 
@@ -54,11 +55,14 @@ button:
     name: "${device_name} 韌體更新"
     entity_category: config
     on_press:
+      #- ota.http_request.flash:
+      #    # 將下行的路徑替換為你的 HA 公開網域 + /local/你的檔名
+      #    url: !lambda |-
+      #      return "http://192.168.31.92:8123/local/taoyuanha/sonoff-s31.bin";
+      #    md5_url: "http://192.168.31.92:8123/local/taoyuanha/sonoff-s31.md5"
       - ota.http_request.flash:  
-          url: "https://cdn.jsdelivr.net/gh/seanyan1994/esphome_s31@main/sonoff-s31.bin"
-          md5_url: "https://cdn.jsdelivr.net/gh/seanyan1994/esphome_s31@main/sonoff-s31.md5"
-
-
+          url: "https://ha.seansy.uk/local/taoyuanha/sonoff-s31.bin"
+          md5_url: "https://ha.seansy.uk/local/taoyuanha/sonoff-s31.md5"
   - platform: restart
     name: "重啟"
 
